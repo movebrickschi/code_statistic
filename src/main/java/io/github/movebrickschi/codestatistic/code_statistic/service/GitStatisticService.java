@@ -76,11 +76,13 @@ public class GitStatisticService {
             }
 
             // 构建 Git 命令：git log --numstat 显示每次提交的文件变更统计
+            // --no-merges 参数用于排除合并提交，只统计真正的代码提交
             ProcessBuilder processBuilder = new ProcessBuilder(
                     "git", "log",
                     currentBranch,  // 指定当前分支
                     "--since=" + since,
                     "--until=" + until,
+                    "--no-merges",  // 排除合并提交
                     "--numstat",
                     "--pretty=format:COMMIT:%an"  // 自定义格式：COMMIT: + 作者名
             );

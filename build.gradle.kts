@@ -22,8 +22,8 @@ dependencies {
         create("IC", "2025.1.4.1")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
 
-        // Add necessary plugin dependencies for compilation here, example:
-        // bundledPlugin("com.intellij.java")
+        // 添加必要的插件依赖以支持编译
+        instrumentationTools()
     }
     // 添加 SLF4J 依赖
     implementation("org.slf4j:slf4j-api:2.0.9")
@@ -34,11 +34,21 @@ dependencies {
 intellijPlatform {
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "242"
+            sinceBuild = "240"
         }
 
         changeNotes = """
-            Initial version
+            English:
+            <ul>
+                <li>Support for viewing code statistics in real-time</li>
+                <li>Added commit history tracking feature</li>
+            </ul>
+            
+            中文:
+            <ul>
+                <li>支持实时查看代码统计信息</li>
+                <li>新增提交历史跟踪功能</li>
+            </ul>
         """.trimIndent()
     }
 }

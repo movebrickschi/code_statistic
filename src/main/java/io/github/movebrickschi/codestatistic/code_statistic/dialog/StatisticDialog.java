@@ -34,6 +34,9 @@ public class StatisticDialog extends DialogWrapper {
     /** 结束日期输入框 */
     private JTextField endDateField;
 
+    /** 对话框主面板，用于居中显示提示弹框 */
+    private JPanel mainPanel;
+
     /**
      * 构造函数
      * @param project 当前项目
@@ -54,8 +57,8 @@ public class StatisticDialog extends DialogWrapper {
     @Override
     protected JComponent createCenterPanel() {
         // 创建主面板，使用边界布局
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        panel.setPreferredSize(new Dimension(700, 400));
+        mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.setPreferredSize(new Dimension(700, 400));
 
         // 创建日期选择面板（顶部区域）
         JPanel datePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -80,7 +83,7 @@ public class StatisticDialog extends DialogWrapper {
         todayButton.addActionListener(e -> loadTodayStatistics());
         datePanel.add(todayButton);
 
-        panel.add(datePanel, BorderLayout.NORTH);
+        mainPanel.add(datePanel, BorderLayout.NORTH);
 
         // 创建统计数据表格（中心区域）
         String[] columnNames = {"排名", "作者", "提交次数", "新增行数", "删除行数", "总变更行数"};
@@ -95,11 +98,10 @@ public class StatisticDialog extends DialogWrapper {
         }
 
         JScrollPane scrollPane = new JScrollPane(table);
-        panel.add(scrollPane, BorderLayout.CENTER);
+        mainPanel.add(scrollPane, BorderLayout.CENTER);
 
-        // 默认加载今日统计数据
-        loadTodayStatistics();
-        return panel;
+        // 不自动加载数据，等待用户点击查询按钮
+        return mainPanel;
     }
 
     /**
@@ -126,8 +128,8 @@ public class StatisticDialog extends DialogWrapper {
                 }
             });
         } catch (Exception e) {
-            // 日期格式错误时显示错误消息
-            JOptionPane.showMessageDialog(table, "日期格式错误: " + e.getMessage());
+            // 日期格式错误时显示错误消息（相对于主面板居中显示）
+            JOptionPane.showMessageDialog(mainPanel, "日期格式错误: " + e.getMessage());
         }
     }
 
@@ -162,6 +164,18 @@ public class StatisticDialog extends DialogWrapper {
         // 清空现有数据
         model.setRowCount(0);
         
+        // 检查是否有数据
+        if (statistics == null || statistics.isEmpty()) {
+            // 没有查询到数据时显示提示弹框（相对于主面板居中显示）
+            JOptionPane.showMessageDialog(
+                mainPanel,
+                "未查询到提交数据，请检查：\n1. 选择的日期范围内是否有提交记录\n2. 当前目录是否为 Git 仓库\n3. Git 是否已正确安装",
+                "提示",
+                JOptionPane.INFORMATION_MESSAGE
+            );
+            return;
+        }
+
         // 遍历统计数据，逐行添加到表格
         int rank = 1;
         for (CommitStatistic stat : statistics) {

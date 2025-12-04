@@ -5,16 +5,57 @@
 
     <!-- Public plugin name should be written in Title Case.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-name -->
-    <name>Code_statistic</name>
+    <name>Code Statistic</name>
 
     <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+    <vendor>LiuChunChi</vendor>
 
     <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
          Guidelines: https://plugins.jetbrains.com/docs/marketplace/best-practices-for-listing.html#plugin-description -->
     <description><![CDATA[
-        Enter short description for your plugin here.<br>
-        <em>most HTML tags may be used</em>
+        <h2>English</h2>
+        <p>A powerful Git commit statistics plugin that helps developers and teams quickly analyze code contribution metrics. Parse Git commit history with one click and generate comprehensive statistics including commit counts, lines added/deleted, and workload distribution by author.</p>
+
+        <h3>Key Features</h3>
+        <ul>
+            <li><strong>Flexible Date Range Query:</strong> Analyze commits for any date range or quickly view today's statistics</li>
+            <li><strong>Comprehensive Metrics:</strong> Track commit counts, lines added, lines deleted, and total changes per author</li>
+            <li><strong>Visual Ranking:</strong> Automatically sort contributors by total changes with clear ranking display</li>
+            <li><strong>Branch-Aware:</strong> Statistics are based on the current Git branch</li>
+            <li><strong>Progress Tracking:</strong> Real-time progress indicator for large repositories with cancellation support</li>
+            <li><strong>User-Friendly Interface:</strong> Intuitive dialog with table view and easy date selection</li>
+            <li><strong>Integrated Workflow:</strong> Access via Tools menu without leaving your IDE</li>
+        </ul>
+
+        <h3>Use Cases</h3>
+        <ul>
+            <li>Generate daily/weekly work reports quickly</li>
+            <li>Track team member contributions and code activity</li>
+            <li>Analyze project development velocity and patterns</li>
+            <li>Review personal coding statistics for retrospectives</li>
+        </ul>
+
+        <h2>中文</h2>
+        <p>一款强大的 Git 提交统计插件，帮助开发者和团队快速分析代码贡献指标。一键解析 Git 提交历史，生成包含提交次数、代码增删行数、作者工作量分布等全面统计数据。</p>
+
+        <h3>主要功能</h3>
+        <ul>
+            <li><strong>灵活的日期范围查询：</strong>可分析任意日期范围的提交，或快速查看今日统计</li>
+            <li><strong>全面的统计指标：</strong>按作者统计提交次数、新增行数、删除行数和总变更行数</li>
+            <li><strong>可视化排名：</strong>自动按总变更行数对贡献者进行排名，清晰展示</li>
+            <li><strong>分支感知：</strong>统计基于当前 Git 分支，确保数据准确</li>
+            <li><strong>进度跟踪：</strong>大型仓库分析时显示实时进度，支持取消操作</li>
+            <li><strong>友好的用户界面：</strong>直观的对话框，表格展示，日期选择简单便捷</li>
+            <li><strong>无缝集成：</strong>通过 Tools 菜单快速访问，不干扰开发流程</li>
+        </ul>
+
+        <h3>使用场景</h3>
+        <ul>
+            <li>快速生成日报/周报，节省手动整理时间</li>
+            <li>跟踪团队成员贡献和代码活跃度</li>
+            <li>分析项目开发速度和模式</li>
+            <li>复盘个人编码统计数据</li>
+        </ul>
     ]]></description>
 
     <!-- Product and plugin compatibility requirements.
