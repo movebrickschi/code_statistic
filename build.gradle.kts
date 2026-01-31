@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "io.github.movebrickschi.codestatistic"
-version = "1.0.0"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -40,12 +40,14 @@ intellijPlatform {
         changeNotes = """
             English:
             <ul>
+                <li>v1.1.0: Statistics based on current Git branch, filtering invalid code changes (empty lines, comments, formatting changes, etc.)</li>
                 <li>Support for viewing code statistics in real-time</li>
                 <li>Added commit history tracking feature</li>
             </ul>
             
             中文:
             <ul>
+                <li>v1.1.0: 基于当前 Git 分支进行统计，过滤无效代码变更（空行、注释、格式调整等）</li>
                 <li>支持实时查看代码统计信息</li>
                 <li>新增提交历史跟踪功能</li>
             </ul>
