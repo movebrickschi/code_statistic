@@ -11,10 +11,12 @@ import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Git 统计服务
  * 负责执行 Git 命令并解析提交历史，统计各作者的代码提交情况
+ * 只统计有效代码变更，排除空行和注释行
  */
 public class GitStatisticService {
     /** 日志记录器 */
@@ -22,6 +24,45 @@ public class GitStatisticService {
 
     /** 当前项目实例 */
     private final Project project;
+
+    /** 匹配空行或只包含空白字符的行 */
+    private static final Pattern EMPTY_LINE_PATTERN = Pattern.compile("^\\s*$");
+
+    /** 匹配单行注释：// 或 # 开头的注释 */
+    private static final Pattern SINGLE_LINE_COMMENT_PATTERN = Pattern.compile("^\\s*(//|#).*$");
+
+    /** 匹配多行注释开始：/* 或 /** */
+    private static final Pattern MULTI_LINE_COMMENT_START_PATTERN = Pattern.compile("^\\s*/\\*.*$");
+
+    /** 匹配多行注释结束 */
+    private static final Pattern MULTI_LINE_COMMENT_END_PATTERN = Pattern.compile("^.*\\*/\\s*$");
+
+    /** 匹配多行注释中间行（以星号开头但不以星号斜杠结尾）或纯注释行 */
+    private static final Pattern MULTI_LINE_COMMENT_MIDDLE_PATTERN = Pattern.compile("^\\s*\\*(?!/).*$");
+
+    /** 匹配 XML/HTML 注释 <!-- --> */
+    private static final Pattern XML_COMMENT_PATTERN = Pattern.compile("^\\s*<!--.*-->\\s*$|^\\s*<!--.*$|^.*-->\\s*$");
+
+    /** 匹配 Java 文档注释标签行 */
+    private static final Pattern JAVADOC_TAG_PATTERN = Pattern.compile("^\\s*\\*\\s*@.*$");
+
+    /** 匹配只包含括号的行（如单独的 { 或 }） */
+    private static final Pattern ONLY_BRACKETS_PATTERN = Pattern.compile("^\\s*[{}()\\[\\]]+\\s*$");
+
+    /** 匹配 import 语句 */
+    private static final Pattern IMPORT_PATTERN = Pattern.compile("^\\s*import\\s+.*$");
+
+    /** 匹配 package 语句 */
+    private static final Pattern PACKAGE_PATTERN = Pattern.compile("^\\s*package\\s+.*$");
+
+    /** 匹配只包含分号的行 */
+    private static final Pattern ONLY_SEMICOLON_PATTERN = Pattern.compile("^\\s*;\\s*$");
+
+    /** 匹配注解行（如 @Override, @Deprecated 等） */
+    private static final Pattern ANNOTATION_PATTERN = Pattern.compile("^\\s*@\\w+.*$");
+
+    /** 匹配空的方法体或类体 */
+    private static final Pattern EMPTY_BODY_PATTERN = Pattern.compile("^\\s*\\{\\s*}\\s*$");
 
     /**
      * 构造函数
@@ -34,6 +75,7 @@ public class GitStatisticService {
     /**
      * 获取指定日期范围内的 Git 提交统计
      * 执行 git log 命令，解析提交历史并统计各作者的代码变更情况
+     * 只统计有效代码变更，排除空行和注释行
      *
      * @param startDate 开始日期
      * @param endDate 结束日期
@@ -86,7 +128,7 @@ public class GitStatisticService {
                 indicator.setFraction(0.25);
             }
 
-            // 构建 Git 命令：git log --numstat 显示每次提交的文件变更统计
+            // 构建 Git 命令：git log -p 显示每次提交的详细 diff 内容
             // --no-merges 参数用于排除合并提交，只统计真正的代码提交
             ProcessBuilder processBuilder = new ProcessBuilder(
                     "git", "log",
@@ -94,7 +136,7 @@ public class GitStatisticService {
                     "--since=" + since,
                     "--until=" + until,
                     "--no-merges",  // 排除合并提交
-                    "--numstat",
+                    "-p",  // 显示详细 diff 内容
                     "--pretty=format:COMMIT:%an"  // 自定义格式：COMMIT: + 作者名
             );
             processBuilder.directory(new java.io.File(basePath));
@@ -114,6 +156,8 @@ public class GitStatisticService {
             String line;
             String currentAuthor = null;  // 当前正在处理的提交作者
             int lineCount = 0;  // 已处理的行数，用于更新进度
+            boolean inMultiLineComment = false;  // 是否在多行注释内
+            boolean inXmlComment = false;  // 是否在 XML 注释内
 
             // 逐行解析 Git 输出
             while ((line = reader.readLine()) != null) {
@@ -124,7 +168,7 @@ public class GitStatisticService {
                     return Collections.emptyList();
                 }
 
-                log.info("当前的line:{}", line);
+                log.debug("当前的line:{}", line);
 
                 // 处理提交标记行：COMMIT:作者名
                 if (line.startsWith("COMMIT:")) {
@@ -132,19 +176,62 @@ public class GitStatisticService {
                     statisticsMap.putIfAbsent(currentAuthor, new CommitStatistic(currentAuthor));
                     // 每次遇到新的提交时，增加提交次数（一次提交算一次）
                     statisticsMap.get(currentAuthor).incrementCommitCount();
+                    // 每次新提交重置多行注释状态
+                    inMultiLineComment = false;
+                    inXmlComment = false;
                 }
-                // 处理文件变更统计行：增加行数 \t 删除行数 \t 文件名
-                else if (currentAuthor != null && !line.isEmpty()) {
-                    String[] parts = line.split("\\s+");
-                    if (parts.length >= 2) {
-                        try {
-                            // 解析增加和删除的行数（"-" 表示二进制文件，按 0 处理）
-                            int additions = parts[0].equals("-") ? 0 : Integer.parseInt(parts[0]);
-                            int deletions = parts[1].equals("-") ? 0 : Integer.parseInt(parts[1]);
-                            // 只累加代码变更行数，不增加提交次数
-                            statisticsMap.get(currentAuthor).addChanges(additions, deletions);
-                        } catch (NumberFormatException ignored) {
-                            // 忽略解析错误的行
+                // 处理 diff 行：以 + 或 - 开头表示新增或删除的代码行
+                else if (currentAuthor != null && (line.startsWith("+") || line.startsWith("-"))) {
+                    // 跳过 diff 头部行（如 +++ a/file 或 --- b/file）
+                    if (line.startsWith("+++") || line.startsWith("---")) {
+                        continue;
+                    }
+
+                    // 获取实际代码内容（去掉开头的 + 或 -）
+                    String codeContent = line.substring(1);
+
+                    // 判断是新增还是删除
+                    boolean isAddition = line.startsWith("+");
+
+                    // 检测并更新多行注释状态
+                    boolean wasInMultiLineComment = inMultiLineComment;
+                    boolean wasInXmlComment = inXmlComment;
+
+                    // 检测多行注释开始
+                    if (MULTI_LINE_COMMENT_START_PATTERN.matcher(codeContent).matches()) {
+                        inMultiLineComment = true;
+                        // 检查是否同一行结束
+                        if (MULTI_LINE_COMMENT_END_PATTERN.matcher(codeContent).matches()) {
+                            inMultiLineComment = false;
+                        }
+                    }
+                    // 检测多行注释结束
+                    if (wasInMultiLineComment && MULTI_LINE_COMMENT_END_PATTERN.matcher(codeContent).matches()) {
+                        inMultiLineComment = false;
+                        continue; // 跳过注释结束行
+                    }
+
+                    // 检测 XML 注释开始
+                    if (codeContent.contains("<!--") && !codeContent.contains("-->")) {
+                        inXmlComment = true;
+                    }
+                    // 检测 XML 注释结束
+                    if (wasInXmlComment && codeContent.contains("-->")) {
+                        inXmlComment = false;
+                        continue; // 跳过注释结束行
+                    }
+
+                    // 如果当前在多行注释或 XML 注释内，跳过
+                    if (wasInMultiLineComment || wasInXmlComment) {
+                        continue;
+                    }
+
+                    // 检查是否为有效代码行（非空行、非注释行）
+                    if (isEffectiveCodeLine(codeContent)) {
+                        if (isAddition) {
+                            statisticsMap.get(currentAuthor).addChanges(1, 0);
+                        } else {
+                            statisticsMap.get(currentAuthor).addChanges(0, 1);
                         }
                     }
                 }
@@ -153,7 +240,7 @@ public class GitStatisticService {
                 lineCount++;
                 if (indicator != null && lineCount % 100 == 0) {
                     indicator.setText("正在处理提交记录... (已处理 " + lineCount + " 行)");
-                    indicator.setFraction(0.35 + (0.5 * Math.min(lineCount / 1000.0, 1.0)));
+                    indicator.setFraction(0.35 + (0.5 * Math.min(lineCount / 5000.0, 1.0)));
                 }
             }
 
@@ -182,6 +269,82 @@ public class GitStatisticService {
         }
 
         return result;
+    }
+
+    /**
+     * 判断一行代码是否为有效代码行
+     * 排除空行、注释行、以及无实际代码产出的行（如格式调整、import语句等）
+     *
+     * @param line 代码行内容
+     * @return 如果是有效代码行返回 true，否则返回 false
+     */
+    private boolean isEffectiveCodeLine(String line) {
+        // 空行或只包含空白字符
+        if (EMPTY_LINE_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // 单行注释：// 或 # 开头
+        if (SINGLE_LINE_COMMENT_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // 多行注释开始行：/* 或 /**
+        if (MULTI_LINE_COMMENT_START_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // 多行注释中间行：以 * 开头
+        if (MULTI_LINE_COMMENT_MIDDLE_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // 多行注释结束行：*/
+        if (MULTI_LINE_COMMENT_END_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // Java 文档注释标签行：* @param 等
+        if (JAVADOC_TAG_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // XML/HTML 注释
+        if (XML_COMMENT_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // 只包含括号的行（如单独的 { 或 }）
+        if (ONLY_BRACKETS_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // import 语句
+        if (IMPORT_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // package 语句
+        if (PACKAGE_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // 只包含分号的行
+        if (ONLY_SEMICOLON_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // 注解行（如 @Override, @Deprecated 等）
+        if (ANNOTATION_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        // 空的方法体或类体 {}
+        if (EMPTY_BODY_PATTERN.matcher(line).matches()) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
